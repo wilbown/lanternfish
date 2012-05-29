@@ -122,6 +122,18 @@
 			}
 			
 			//***Arduino
+			private function arduinoConnect():void {
+				var p:String = arduinoPort.toString();
+				arduino = new ArduinoConnector();
+				arduino.connect("COM"+p, 57600);
+				if (arduino.portOpen) {
+					arduino.addEventListener(ProgressEvent.SOCKET_DATA, this.onArduino);
+					lblStatus.text = "Successfully connected to Arduino on port COM"+p;
+				} else {
+					arduino.dispose(); arduino = null;
+					lblStatus.text = "Failed to connect to Arduino on port COM"+p.toString();
+				}
+			}
 			protected function txtCOMPort_changeHandler(event:Event):void {
 				var p:int = int(txtCOMPort.text);
 				if (p < 1 || p > 256) {
@@ -131,6 +143,13 @@
 				arduinoPort = p;
 				if (arduino!=null) arduino.dispose();
 				arduinoConnect();
+			}
+			protected function btnDisconnect_changeHandler(event:Event):void {
+				if (arduino!=null) {
+					arduino.removeEventListener(ProgressEvent.SOCKET_DATA, this.onArduino);
+					arduino.dispose(); arduino = null;
+					lblStatus.text = "Disconnected from Arduino.";
+				}
 			}
 			public function onTrigger1(event:MouseEvent):void {
 				if (arduino!=null && arduino.portOpen) {
@@ -324,15 +343,7 @@
 			}
 			
 			
-			//helpers**************************************************************
-			private function arduinoConnect():void {
-				var p:String = arduinoPort.toString();
-				arduino = new ArduinoConnector();
-				arduino.connect("COM"+p, 57600);
-				//arduino.addEventListener(ProgressEvent.SOCKET_DATA, this.onArduino);
-				if (arduino.portOpen) lblStatus.text = "Successfully connected to Arduino on port COM"+p;
-				else lblStatus.text = "Failed to connect to Arduino on port COM"+p.toString();
-			}
+			//GUI helpers**************************************************************
 			//setup and open a Window object fullscreen
 			private static function setupFullscreenWindowAIR(win:Window, screen:Screen = null, visible:Boolean = false):void {
 				if (screen == null) screen = Screen.mainScreen;
@@ -397,6 +408,7 @@
 		<s:TextInput id="txtCOMPort" x="175" y="233.75" width="24"
 					  enter="txtCOMPort_changeHandler(event)" text="6"/>
 		<s:Button id="btnConnect" x="210" y="234" label="Connect" click="txtCOMPort_changeHandler(event)"/>
+		<s:Button id="btnDisconnect" x="290" y="234" label="Disconnect" click="btnDisconnect_changeHandler(event)"/>
 		<s:Button id="btnTrig1" x="454" y="167" label="Trigger 1" click="onTrigger1(event)"/>
 		<s:Button id="btnTrig2" x="454" y="200" label="Trigger 2" click="onTrigger2(event)"/>
 		<s:Button id="btnTrig3" x="454" y="234" label="Trigger 3" click="onTrigger3(event)"/>
