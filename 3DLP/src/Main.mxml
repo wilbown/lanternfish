@@ -15,6 +15,7 @@
 		<![CDATA[
 			import com.quetwo.Arduino.ArduinoConnector;
 			
+			import mx.collections.ArrayList;
 			import mx.events.FlexEvent;
 			
 			import spark.components.Window;
@@ -38,10 +39,14 @@
 			private var ui_slide:Bitmap;
 			private var ui_blank:BitmapData;
 			
+			private var lstSmoothing:ArrayList = new ArrayList([0.5,1,2,3,4]);
+			
 			//event handlers**************************************************************
 			private function handleInit():void {
 				File3D = File.desktopDirectory; txtFile3D.text = File3D.nativePath;
 				SliceFolder = File.desktopDirectory.resolvePath("3DLP\\slides"); txtSliceFolder.text = SliceFolder.nativePath;
+				//drpSmoothing.dataProvider = new ArrayList([0.5,1,2,3,4]);
+				//drpSmoothing.labelFunction = function(i:Object):String{return i.toString()+"x"};
 			}
 			private function handleLoad():void {
 				arduinoConnect();
@@ -154,19 +159,19 @@
 			public function onTrigger1(event:MouseEvent):void {
 				if (arduino!=null && arduino.portOpen) {
 					arduino.writeByte(49);
-					lblStatus.text = "Trigger 1 sent";
+					lblStatus.text = "Arduino Trigger 1 sent";
 				}
 			}
 			public function onTrigger2(event:MouseEvent):void {
 				if (arduino!=null && arduino.portOpen) {
 					arduino.writeByte(50);
-					lblStatus.text = "Trigger 2 sent";
+					lblStatus.text = "Arduino Trigger 2 sent";
 				}
 			}
 			public function onTrigger3(event:MouseEvent):void {
 				if (arduino!=null && arduino.portOpen) {
 					arduino.writeByte(51);
-					lblStatus.text = "Trigger 3 sent";
+					lblStatus.text = "Arduino Trigger 3 sent";
 				}
 			}
 			private function onArduino(e:ProgressEvent):void {
@@ -220,15 +225,22 @@
 				if (!SliceFolder.exists) {
 					lblStatus.text = "Slice folder not found."; return;
 				}
+				slice_height = Number(txtSliceThickness.text);
+				if (isNaN(slice_height)) {
+					lblStatus.text = "Slice Thickness is not a number."; return;
+				}
+				shell_thickness = Number(txtShellThickness.text);
+				if (chkHollow.selected && isNaN(shell_thickness)) {
+					lblStatus.text = "Shell Thickness is not a number."; return;
+				}
 				
 				lblStatus.text = "Getting 3D object info...";
 				
 				SliceFolder.deleteDirectory(true);
 				SliceFolder.createDirectory();
 				
-				//get 3D model info
+				//get needed 3D model info from Slicer
 				buff = "";
-				
 				var psi:NativeProcessStartupInfo = new NativeProcessStartupInfo();
 				psi.executable = SliceApp;
 				psi.arguments = new <String>[File3D.nativePath];
@@ -245,6 +257,9 @@
 				buff += tmp;
 				trace("Got: ", tmp); 
 			}
+			private var slice_height:Number = 1.0;
+			private var shell_thickness:Number = 1.0;
+			private var slicer_args:Vector.<String>;
 			public function onExitInfo(event:NativeProcessExitEvent):void {
 				ps.removeEventListener(ProgressEvent.STANDARD_OUTPUT_DATA, onOutputInfo);
 				ps.removeEventListener(NativeProcessExitEvent.EXIT, onExitInfo);
@@ -254,11 +269,19 @@
 				trace("zlo["+info.zlo.toString()+"]");
 				trace("zhi["+info.zhi.toString()+"]");
 				
-				lblStatus.text = "Generating slices...";
+				//setup slices
+				var w:int = SlideShowScreen.bounds.width * drpSmoothing.selectedItem as Number;
+				var h:int = SlideShowScreen.bounds.height * drpSmoothing.selectedItem as Number;
+				trace("w["+w.toString()+"]");
+				trace("h["+h.toString()+"]");
+				slicer_args = new <String>[File3D.nativePath,"--cavity=black","--core=white","--layer="+(slice_height*1.1).toString(),"-z"+info.zlo.toString()+","+info.zhi.toString()+","+slice_height.toString(),"-w",w.toString(),"-h",h.toString()];
+				
 				//create slices
+				lblStatus.text = "Generating slices...";
 				var psi:NativeProcessStartupInfo = new NativeProcessStartupInfo();
 				psi.executable = SliceApp;
-				psi.arguments = new <String>[File3D.nativePath,"--cavity=black","--core=white","-z"+info.zlo.toString()+","+info.zhi.toString()+","+txtSliceHeight.text,"-o","slice.png","-w",SlideShowScreen.bounds.width.toString(),"-h",SlideShowScreen.bounds.height.toString()];
+				psi.arguments = slicer_args.concat(new <String>["-o","slice.png"]);
+				trace("psi.arguments["+psi.arguments.toString()+"]");
 				psi.workingDirectory = SliceFolder;
 				
 				ps.addEventListener(NativeProcessExitEvent.EXIT, onExitSlice);
@@ -266,8 +289,29 @@
 			}
 			public function onExitSlice(event:NativeProcessExitEvent):void {
 				ps.removeEventListener(NativeProcessExitEvent.EXIT, onExitSlice);
+				trace("Slicing exited with ", event.exitCode);
+				
+				if (chkHollow.selected) {
+					//create hollow cutout slices
+					lblStatus.text = "Generating hollow cutout slices...";
+					var psi:NativeProcessStartupInfo = new NativeProcessStartupInfo();
+					psi.executable = SliceApp;
+					psi.arguments = slicer_args.concat(new <String>["-o","xslice.png","--shell","--offset=0","--radius="+shell_thickness.toString()]);
+					trace("psi.arguments["+psi.arguments.toString()+"]");
+					psi.workingDirectory = SliceFolder;
+					ps.addEventListener(NativeProcessExitEvent.EXIT, onExitCutout);
+					ps.start(psi);
+				} else {
+					lblStatus.text = "Done generating slices.";
+				}
+			}
+			public function onExitCutout(event:NativeProcessExitEvent):void {
+				ps.removeEventListener(NativeProcessExitEvent.EXIT, onExitCutout);
+				trace("Cutout slicing exited with ", event.exitCode);
+				//use slice.png to cut out xslice.png by multiplying pixels
+				lblStatus.text = "Cutting out slices....";
+				
 				lblStatus.text = "Done generating slices.";
-				trace("Slice slicing exited with ", event.exitCode);
 			}
 			
 			
@@ -388,39 +432,49 @@
 	</fx:Declarations>
 	<s:BorderContainer y="11" width="541" height="300" backgroundColor="#000000" borderVisible="true"
 					   horizontalCenter="0">
-		<s:Label id="txtFile3D" x="143" y="16.95" width="310" color="#FFFFFF"/>
+		<s:Label id="txtFile3D" x="143" y="14.95" width="310" color="#FFFFFF"/>
 		<s:Button id="btnChooseFile3D" x="461" y="14.150024" label="Choose"
 				  click="btnChooseFile3D_click(event)"/>
-		<s:Label id="txtSliceFolder" x="143" y="48.95" width="310" color="#FFFFFF"
+		<s:Label id="txtSliceFolder" x="143" y="46.95" width="310" color="#FFFFFF"
 				 fontWeight="normal"/>
 		<s:Button id="btnChooseSliceFolder" x="461" y="46.150024" label="Choose"
 				  click="btnChooseSliceFolder_click(event)"/>
-		<s:TextInput id="txtSliceHeight" x="143" y="79.95" width="100" text="0.5"/>
-		<s:Button id="btnGenerate" x="422" y="81" label="Generate Slices"
+		<s:TextInput id="txtSliceThickness" x="346" y="99.95" width="43" text="1.0"/>
+		<s:Button id="btnGenerate" x="422" y="98" label="Generate Slices" chromeColor="#8EC87A"
 				  click="btnGenerate_click(event)"/>
-		<s:TextInput id="txtExposureTime" x="143" y="141.95" width="100" text="8000"/>
-		<s:TextInput id="txtStepperTime" x="143" y="173" width="100" text="2000"/>
-		<s:Button id="btnPreview" x="257" y="144" label="Preview"
-				  click="btnPreview_click(event)"/>
-		<s:Button id="btnPrint" x="337" y="144" label="Start Print"
-				  click="btnPrint_click(event)"/>
-		<s:Button id="btnStop" x="337" y="177" width="74" label="Stop" click="btnStop_click(event)"/>
-		<s:TextInput id="txtCOMPort" x="175" y="233.75" width="24"
+		<s:TextInput id="txtCOMPort" x="175" y="238.75" width="24"
 					  enter="txtCOMPort_changeHandler(event)" text="6"/>
-		<s:Button id="btnConnect" x="210" y="234" label="Connect" click="txtCOMPort_changeHandler(event)"/>
-		<s:Button id="btnDisconnect" x="290" y="234" label="Disconnect" click="btnDisconnect_changeHandler(event)"/>
-		<s:Button id="btnTrig1" x="454" y="167" label="Trigger 1" click="onTrigger1(event)"/>
-		<s:Button id="btnTrig2" x="454" y="200" label="Trigger 2" click="onTrigger2(event)"/>
-		<s:Button id="btnTrig3" x="454" y="234" label="Trigger 3" click="onTrigger3(event)"/>
+		<s:Button id="btnConnect" x="210" y="239" label="Connect" click="txtCOMPort_changeHandler(event)"/>
+		<s:Button id="btnDisconnect" x="290" y="239" label="Disconnect" click="btnDisconnect_changeHandler(event)"/>
+		<s:Button id="btnTrig1" x="450" y="172" label="Trigger 1" click="onTrigger1(event)"/>
+		<s:Button id="btnTrig2" x="450" y="205" label="Trigger 2" click="onTrigger2(event)"/>
+		<s:Button id="btnTrig3" x="450" y="239" label="Trigger 3" click="onTrigger3(event)"/>
 		<s:Label x="64" y="51" color="#AAAAAA" text="Slice Folder" textAlign="right"/>
 		<s:Label x="52" y="19" color="#AAAAAA" text="3D Object File" textAlign="right"/>
-		<s:Label x="10" y="84" color="#AAAAAA" text="Slice Thickness (mm)" textAlign="right"/>
-		<s:Label x="18" y="146" color="#AAAAAA" text="Exposure Time (ms)" textAlign="right"/>
-		<s:Label x="62" y="239.75" color="#AAAAAA" text="Arduino Port" textAlign="right"/>
-		<s:Label x="145" y="239.75" color="#FFFFFF" text="COM" textAlign="right"/>
-		<s:Label x="10" y="177" color="#AAAAAA" text="Stepper Timeout (ms)" textAlign="right"/>
+		<s:Label x="214" y="105" color="#AAAAAA" text="Slice Thickness (mm)" textAlign="right"/>
+		<s:Label x="273" y="80" color="#AAAAAA" text="Smoothing" textAlign="right"/>
+		<s:Label x="62" y="244.75" color="#AAAAAA" text="Arduino Port" textAlign="right"/>
+		<s:Label x="145" y="244.75" color="#FFFFFF" text="COM" textAlign="right"/>
 		<s:Label id="lblStatus" y="276" color="#E08F38" fontSize="16" horizontalCenter="0"
 				 text="status..." textAlign="center"/>
+		<s:BorderContainer x="-1" y="128" width="427" height="92" backgroundColor="#000000">
+			<s:TextInput id="txtExposureTime" x="144" y="14.95" width="67" text="8000"/>
+			<s:TextInput id="txtStepperTime" x="144" y="46" width="67" text="2000"/>
+			<s:Button id="btnPreview" x="238" y="17" label="Preview" chromeColor="#E8EB9D"
+					  click="btnPreview_click(event)"/>
+			<s:Button id="btnPrint" x="318" y="17" label="Start Print" chromeColor="#9DCA97"
+					  click="btnPrint_click(event)"/>
+			<s:Button id="btnStop" x="318" y="50" width="74" label="Stop" chromeColor="#CA8080"
+					  click="btnStop_click(event)"/>
+			<s:Label x="19" y="19" color="#AAAAAA" text="Exposure Time (ms)" textAlign="right"/>
+			<s:Label x="11" y="50" color="#AAAAAA" text="Stepper Timeout (ms)" textAlign="right"/>
+		</s:BorderContainer>
+		<s:CheckBox id="chkHollow" x="143" y="75" color="#AAAAAA"/>
+		<s:TextInput id="txtShellThickness" x="143" y="97.95" width="43" text="1.0"/>
+		<s:Label x="9" y="103" color="#AAAAAA" text="Shell Thickness (mm)" textAlign="right"/>
+		<s:Label x="60" y="80" color="#AAAAAA" text="Hollow Shell" textAlign="right"/>
+		<s:DropDownList id="drpSmoothing" x="346" y="74" width="56" dataProvider="{lstSmoothing}"
+						selectedIndex="1"></s:DropDownList>
 	</s:BorderContainer>
 	<s:BorderContainer y="322" width="542" height="305" backgroundColor="#000000"
 					   horizontalCenter="0">
