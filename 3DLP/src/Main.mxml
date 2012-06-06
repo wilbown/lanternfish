@@ -17,6 +17,7 @@
 			
 			import mx.collections.ArrayList;
 			import mx.events.FlexEvent;
+			import mx.graphics.codec.PNGEncoder;
 			
 			import spark.components.Window;
 			
@@ -95,9 +96,7 @@
 			private var wherePaused:String = "";
 			private function onKeyDown(e:KeyboardEvent):void {
 				trace("got key: "+e.keyCode.toString());
-				if (e.keyCode == Keyboard.ESCAPE) {
-					this.close();
-				} else if (e.keyCode == Keyboard.SPACE) { //pause on blank/play next slide
+				if (e.keyCode == Keyboard.SPACE) { //pause on blank/play next slide
 					if (showTimer.running) {
 						showTimer.reset();
 						wherePaused = "S";
@@ -109,7 +108,7 @@
 						else if (wherePaused=="B") onShow(null);
 						wherePaused = "";
 					}
-				} else if (e.keyCode == Keyboard.S) { //stop
+				} else if (e.keyCode == Keyboard.S || e.keyCode == Keyboard.ESCAPE) { //stop
 					lblStatus.text = "Stopped printing slices.";
 					stopPrint();
 				} else if (e.keyCode == Keyboard.LEFT) { //back a slide
@@ -159,19 +158,19 @@
 			public function onTrigger1(event:MouseEvent):void {
 				if (arduino!=null && arduino.portOpen) {
 					arduino.writeByte(49);
-					lblStatus.text = "Arduino Trigger 1 sent";
+					lblStatus.text = "Trigger 1 sent to Arduino";
 				}
 			}
 			public function onTrigger2(event:MouseEvent):void {
 				if (arduino!=null && arduino.portOpen) {
 					arduino.writeByte(50);
-					lblStatus.text = "Arduino Trigger 2 sent";
+					lblStatus.text = "Trigger 2 sent to Arduino";
 				}
 			}
 			public function onTrigger3(event:MouseEvent):void {
 				if (arduino!=null && arduino.portOpen) {
 					arduino.writeByte(51);
-					lblStatus.text = "Arduino Trigger 3 sent";
+					lblStatus.text = "Trigger 3 sent to Arduino";
 				}
 			}
 			private function onArduino(e:ProgressEvent):void {
@@ -222,9 +221,6 @@
 				if (!File3D.exists || File3D.isDirectory || File3D.isPackage) {
 					lblStatus.text = "3D object file not found."; return;
 				}
-				if (!SliceFolder.exists) {
-					lblStatus.text = "Slice folder not found."; return;
-				}
 				slice_height = Number(txtSliceThickness.text);
 				if (isNaN(slice_height)) {
 					lblStatus.text = "Slice Thickness is not a number."; return;
@@ -233,11 +229,16 @@
 				if (chkHollow.selected && isNaN(shell_thickness)) {
 					lblStatus.text = "Shell Thickness is not a number."; return;
 				}
+				if (SliceFolder.exists) {
+					try {
+						SliceFolder.deleteDirectory(true);
+					} catch (e:Error) {
+						lblStatus.text = "Could not remove Slice Folder."; return;
+					}
+				}
+				SliceFolder.createDirectory();
 				
 				lblStatus.text = "Getting 3D object info...";
-				
-				SliceFolder.deleteDirectory(true);
-				SliceFolder.createDirectory();
 				
 				//get needed 3D model info from Slicer
 				buff = "";
@@ -308,10 +309,63 @@
 			public function onExitCutout(event:NativeProcessExitEvent):void {
 				ps.removeEventListener(NativeProcessExitEvent.EXIT, onExitCutout);
 				trace("Cutout slicing exited with ", event.exitCode);
+				
 				//use slice.png to cut out xslice.png by multiplying pixels
 				lblStatus.text = "Cutting out slices....";
 				
-				lblStatus.text = "Done generating slices.";
+				sliceFiles = new Array();
+				for each (var f:File in SliceFolder.getDirectoryListing()) {
+					if (f.name.substr(0,6) == "slice_") sliceFiles.push(f);
+				} 
+				if (sliceFiles.length > 0) {
+					curSlice = 0;
+					preview.addEventListener(FlexEvent.READY, onSliceReady);
+					preview.source = (sliceFiles[curSlice] as File).nativePath;
+				}
+			}
+			private var current_slice_BM:BitmapData = null;
+			private var sliceF:File = null;
+			private var cutoutF:File = null;
+			public function onSliceReady(e:FlexEvent):void {
+				preview.removeEventListener(FlexEvent.READY, onSliceReady);
+				//trace("onSliceReady");
+				current_slice_BM = preview.bitmapData;
+				
+				sliceF = (sliceFiles[curSlice] as File);
+				var cutout_path:String = sliceF.nativePath.substr(0,sliceF.nativePath.length-sliceF.name.length)+"x"+sliceF.name;
+				trace("cutout_path [",cutout_path,"]");
+				
+				cutoutF = new File(cutout_path);
+				if (cutoutF.exists) {
+					preview.addEventListener(FlexEvent.READY, onCutoutReady);
+					preview.source = cutoutF.nativePath;
+				}
+			}
+			public function onCutoutReady(e:FlexEvent):void {
+				preview.removeEventListener(FlexEvent.READY, onCutoutReady);
+				//trace("onCutoutReady");
+				curSlice++;
+				current_slice_BM.draw(preview.bitmapData, null, null, BlendMode.MULTIPLY);
+				
+				//save
+				var png:PNGEncoder = new PNGEncoder();
+				var fs:FileStream = new FileStream();
+				fs.open(sliceF, FileMode.WRITE);
+				fs.writeBytes(png.encode(current_slice_BM));
+				fs.close();
+				current_slice_BM.dispose();
+				preview.bitmapData.dispose();
+				cutoutF.deleteFile();
+				
+				lblStatus.text = "Cut out "+sliceF.name;
+				
+				if (curSlice >= sliceFiles.length) {
+					lblStatus.text = "Done generating slices.";
+					preview.source = ui_blank;
+				} else {
+					preview.addEventListener(FlexEvent.READY, onSliceReady);
+					preview.source = (sliceFiles[curSlice] as File).nativePath;
+				}
 			}
 			
 			
@@ -336,7 +390,7 @@
 			private function stopPrint():void {
 				blankTimeout.reset(); showTimer.reset();
 				showBlankSlide();
-				if (SlideShowSameScreen) {
+				if (SlideShowSameScreen && !showPreview) {
 					SlideShow.visible = false;
 					Mouse.show();
 				}
@@ -348,7 +402,7 @@
 				
 				sliceFiles = SliceFolder.getDirectoryListing();
 				curSlice = 0;
-				if (SlideShowSameScreen) {
+				if (SlideShowSameScreen && !showPreview) {
 					Mouse.hide();
 					SlideShow.visible = true;
 				}
@@ -356,12 +410,12 @@
 			}
 			public function onBlank(e:TimerEvent):void {
 				lblStatus.text = "Waiting for stepper...";
-				showBlankSlide(); trace("onBlank");
 				if (curSlice >= sliceFiles.length) {
 					lblStatus.text = "Done printing slices.";
 					stopPrint();
 					return;
 				}
+				showBlankSlide(); trace("onBlank");
 				if (arduino!=null && arduino.portOpen) arduino.writeByte(48);
 				blankTimeout.start();
 			}
@@ -457,17 +511,17 @@
 		<s:Label x="145" y="244.75" color="#FFFFFF" text="COM" textAlign="right"/>
 		<s:Label id="lblStatus" y="276" color="#E08F38" fontSize="16" horizontalCenter="0"
 				 text="status..." textAlign="center"/>
-		<s:BorderContainer x="-1" y="128" width="427" height="92" backgroundColor="#000000">
-			<s:TextInput id="txtExposureTime" x="144" y="14.95" width="67" text="8000"/>
-			<s:TextInput id="txtStepperTime" x="144" y="46" width="67" text="2000"/>
-			<s:Button id="btnPreview" x="238" y="17" label="Preview" chromeColor="#E8EB9D"
+		<s:BorderContainer x="-1" y="141" width="427" height="82" backgroundColor="#000000">
+			<s:TextInput id="txtExposureTime" x="144" y="12.95" width="67" text="2000"/>
+			<s:TextInput id="txtStepperTime" x="144" y="44" width="67" text="2000"/>
+			<s:Button id="btnPreview" x="238" y="15" label="Preview" chromeColor="#E8EB9D"
 					  click="btnPreview_click(event)"/>
-			<s:Button id="btnPrint" x="318" y="17" label="Start Print" chromeColor="#9DCA97"
+			<s:Button id="btnPrint" x="318" y="15" label="Start Print" chromeColor="#9DCA97"
 					  click="btnPrint_click(event)"/>
-			<s:Button id="btnStop" x="318" y="50" width="74" label="Stop" chromeColor="#CA8080"
+			<s:Button id="btnStop" x="318" y="48" width="74" label="Stop" chromeColor="#CA8080"
 					  click="btnStop_click(event)"/>
-			<s:Label x="19" y="19" color="#AAAAAA" text="Exposure Time (ms)" textAlign="right"/>
-			<s:Label x="11" y="50" color="#AAAAAA" text="Stepper Timeout (ms)" textAlign="right"/>
+			<s:Label x="19" y="17" color="#AAAAAA" text="Exposure Time (ms)" textAlign="right"/>
+			<s:Label x="11" y="48" color="#AAAAAA" text="Stepper Timeout (ms)" textAlign="right"/>
 		</s:BorderContainer>
 		<s:CheckBox id="chkHollow" x="143" y="75" color="#AAAAAA"/>
 		<s:TextInput id="txtShellThickness" x="143" y="97.95" width="43" text="1.0"/>
