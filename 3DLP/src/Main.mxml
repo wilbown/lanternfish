@@ -89,7 +89,7 @@
 				stage.addEventListener(KeyboardEvent.KEY_DOWN, this.onKeyDown);
 			}
 			private function handleClose():void {
-				if (arduino!=null) arduino.dispose();
+				arduinoDisconnect();
 				SlideShow.close();
 			}
 			//main app control keys
@@ -138,19 +138,26 @@
 					lblStatus.text = "Failed to connect to Arduino on port COM"+p.toString();
 				}
 			}
-			protected function txtCOMPort_changeHandler(event:Event):void {
+			private function arduinoDisconnect():void {
+				if (arduino!=null) {
+					if (arduino.portOpen) arduino.close();
+					arduino.dispose();
+				}
+			}
+			protected function txtCOMPort_connectHandler(event:Event):void {
 				var p:int = int(txtCOMPort.text);
 				if (p < 1 || p > 256) {
 					lblStatus.text = "Unusable port COM"+p.toString();
 					return;
 				}
 				arduinoPort = p;
-				if (arduino!=null) arduino.dispose();
+				arduinoDisconnect();
 				arduinoConnect();
 			}
-			protected function btnDisconnect_changeHandler(event:Event):void {
+			protected function btnDisconnect_Handler(event:Event):void {
 				if (arduino!=null) {
 					arduino.removeEventListener(ProgressEvent.SOCKET_DATA, this.onArduino);
+					if (arduino.portOpen) arduino.close();
 					arduino.dispose(); arduino = null;
 					lblStatus.text = "Disconnected from Arduino.";
 				}
@@ -493,13 +500,18 @@
 				 fontWeight="normal"/>
 		<s:Button id="btnChooseSliceFolder" x="461" y="46.150024" label="Choose"
 				  click="btnChooseSliceFolder_click(event)"/>
+		<s:CheckBox id="chkHollow" x="143" y="75" color="#AAAAAA"/>
+		<s:TextInput id="txtShellThickness" x="143" y="97.95" width="43" text="1.0"/>
+		<s:Label x="9" y="103" color="#AAAAAA" text="Shell Thickness (mm)" textAlign="right"/>
+		<s:Label x="60" y="80" color="#AAAAAA" text="Hollow Shell" textAlign="right"/>
+		<s:DropDownList id="drpSmoothing" x="346" y="74" width="56" dataProvider="{lstSmoothing}"
+						selectedIndex="1"></s:DropDownList>
 		<s:TextInput id="txtSliceThickness" x="346" y="99.95" width="43" text="1.0"/>
 		<s:Button id="btnGenerate" x="422" y="98" label="Generate Slices" chromeColor="#8EC87A"
 				  click="btnGenerate_click(event)"/>
-		<s:TextInput id="txtCOMPort" x="175" y="238.75" width="24"
-					  enter="txtCOMPort_changeHandler(event)" text="6"/>
-		<s:Button id="btnConnect" x="210" y="239" label="Connect" click="txtCOMPort_changeHandler(event)"/>
-		<s:Button id="btnDisconnect" x="290" y="239" label="Disconnect" click="btnDisconnect_changeHandler(event)"/>
+		<s:TextInput id="txtCOMPort" x="175" y="238.75" width="24" enter="txtCOMPort_connectHandler(event)" text="6"/>
+		<s:Button id="btnConnect" x="210" y="239" label="Connect" click="txtCOMPort_connectHandler(event)"/>
+		<s:Button id="btnDisconnect" x="290" y="239" label="Disconnect" click="btnDisconnect_Handler(event)"/>
 		<s:Button id="btnTrig1" x="450" y="172" label="Trigger 1" click="onTrigger1(event)"/>
 		<s:Button id="btnTrig2" x="450" y="205" label="Trigger 2" click="onTrigger2(event)"/>
 		<s:Button id="btnTrig3" x="450" y="239" label="Trigger 3" click="onTrigger3(event)"/>
@@ -509,8 +521,6 @@
 		<s:Label x="273" y="80" color="#AAAAAA" text="Smoothing" textAlign="right"/>
 		<s:Label x="62" y="244.75" color="#AAAAAA" text="Arduino Port" textAlign="right"/>
 		<s:Label x="145" y="244.75" color="#FFFFFF" text="COM" textAlign="right"/>
-		<s:Label id="lblStatus" y="276" color="#E08F38" fontSize="16" horizontalCenter="0"
-				 text="status..." textAlign="center"/>
 		<s:BorderContainer x="-1" y="141" width="427" height="82" backgroundColor="#000000">
 			<s:TextInput id="txtExposureTime" x="144" y="12.95" width="67" text="2000"/>
 			<s:TextInput id="txtStepperTime" x="144" y="44" width="67" text="2000"/>
@@ -523,12 +533,8 @@
 			<s:Label x="19" y="17" color="#AAAAAA" text="Exposure Time (ms)" textAlign="right"/>
 			<s:Label x="11" y="48" color="#AAAAAA" text="Stepper Timeout (ms)" textAlign="right"/>
 		</s:BorderContainer>
-		<s:CheckBox id="chkHollow" x="143" y="75" color="#AAAAAA"/>
-		<s:TextInput id="txtShellThickness" x="143" y="97.95" width="43" text="1.0"/>
-		<s:Label x="9" y="103" color="#AAAAAA" text="Shell Thickness (mm)" textAlign="right"/>
-		<s:Label x="60" y="80" color="#AAAAAA" text="Hollow Shell" textAlign="right"/>
-		<s:DropDownList id="drpSmoothing" x="346" y="74" width="56" dataProvider="{lstSmoothing}"
-						selectedIndex="1"></s:DropDownList>
+		<s:Label id="lblStatus" y="276" color="#E08F38" fontSize="16" horizontalCenter="0"
+				 text="status..." textAlign="center"/>
 	</s:BorderContainer>
 	<s:BorderContainer y="322" width="542" height="305" backgroundColor="#000000"
 					   horizontalCenter="0">
