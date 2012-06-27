@@ -10,7 +10,7 @@
         </excludedEntries>
       </libraryPathEntry>
       <libraryPathEntry kind="1" linkType="1" path="libs"/>
-      <libraryPathEntry kind="5" linkType="2" path="libs/as3-ArduinoConnector-1-2-0/ArduinoConnector.ane"/>
+      <libraryPathEntry kind="5" linkType="2" path="as3-ArduinoConnector-1-2-0/ArduinoConnector.ane"/>
     </libraryPath>
     <sourceAttachmentPath/>
   </compiler>
@@ -27,7 +27,7 @@
       <airSettings airCertificatePath="C:/mozaex_dev/_installer/Adobe AIR Signing Digital Certificate.p12" airTimestamp="true" anePathSet="true" version="1">
         <airExcludes/>
         <anePaths>
-          <anePathEntry path="C:/dev_lanternfish/trunk/3DLP/libs/as3-ArduinoConnector-1-2-0/ArduinoConnector.ane"/>
+          <anePathEntry path="C:/dev_lanternfish/trunk/3DLP/as3-ArduinoConnector-1-2-0/ArduinoConnector.ane"/>
         </anePaths>
       </airSettings>
       <actionScriptSettings version="1"/>
