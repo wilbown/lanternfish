@@ -40,6 +40,7 @@
 			private var ui_slide:Bitmap;
 			private var ui_blank:BitmapData;
 			
+			[Bindable]
 			private var lstSmoothing:ArrayList = new ArrayList([0.5,1,2,3,4]);
 			
 			//event handlers**************************************************************
@@ -140,6 +141,7 @@
 			}
 			private function arduinoDisconnect():void {
 				if (arduino!=null) {
+					arduino.removeEventListener(ProgressEvent.SOCKET_DATA, this.onArduino);
 					if (arduino.portOpen) arduino.close();
 					arduino.dispose();
 				}
@@ -156,9 +158,7 @@
 			}
 			protected function btnDisconnect_Handler(event:Event):void {
 				if (arduino!=null) {
-					arduino.removeEventListener(ProgressEvent.SOCKET_DATA, this.onArduino);
-					if (arduino.portOpen) arduino.close();
-					arduino.dispose(); arduino = null;
+					arduinoDisconnect(); arduino = null;
 					lblStatus.text = "Disconnected from Arduino.";
 				}
 			}
