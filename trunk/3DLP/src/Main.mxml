@@ -276,6 +276,10 @@
 				info = JSON.parse(buff);
 				trace("zlo["+info.zlo.toString()+"]");
 				trace("zhi["+info.zhi.toString()+"]");
+				var model_xw:Number = 0;
+				var model_yw:Number = 0;
+				trace("xw["+model_xw.toString()+"]");
+				trace("yw["+model_yw.toString()+"]");
 				
 				//setup slices
 				var w:int = SlideShowScreen.bounds.width * drpSmoothing.selectedItem as Number;
