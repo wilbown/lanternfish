@@ -6,7 +6,7 @@
 					   applicationComplete="handleLoad();"
 					   closing="handleClose();"
 					   showStatusBar="false"
-					   width="562" height="668" backgroundColor="#000000">
+					   width="562" height="668" backgroundColor="#202020">
 	<s:layout>
 		<s:BasicLayout/>
 	</s:layout>
@@ -75,9 +75,11 @@
 				SlideShow = new Window();
 				SlideShow.title = "3DLP Printing...";
 				SlideShow.alwaysInFront = true;
+				SlideShow.opaqueBackground = 0xFF0000;
 				setupFullscreenWindowAIR(SlideShow, SlideShowScreen, !SlideShowSameScreen);
 				ui_blank = (new Eblank()).bitmapData;
 				ui_slide = new Bitmap();
+				ui_slide.opaqueBackground = 0xFF0000;
 				setBitmapData(ui_slide, ui_blank, SlideShowScreen.bounds.width, SlideShowScreen.bounds.height);
 				SlideShow.stage.addChild(ui_slide);
 				
@@ -88,6 +90,7 @@
 				blankTimeout.addEventListener(TimerEvent.TIMER_COMPLETE, onShow);
 				
 				stage.addEventListener(KeyboardEvent.KEY_DOWN, this.onKeyDown);
+				SlideShow.addEventListener(KeyboardEvent.KEY_DOWN, this.onKeyDown);
 			}
 			private function handleClose():void {
 				arduinoDisconnect();
@@ -96,7 +99,8 @@
 			//main app control keys
 			private var wherePaused:String = "";
 			private function onKeyDown(e:KeyboardEvent):void {
-				trace("got key: "+e.keyCode.toString());
+				//trace("got key: "+e.keyCode.toString());
+				if (!printing) return;
 				if (e.keyCode == Keyboard.SPACE) { //pause on blank/play next slide
 					if (showTimer.running) {
 						showTimer.reset();
@@ -274,16 +278,15 @@
 				trace("Slice info exited with ", event.exitCode);
 				
 				info = JSON.parse(buff);
-				trace("zlo["+info.zlo.toString()+"]");
-				trace("zhi["+info.zhi.toString()+"]");
-				var model_xw:Number = 0;
-				var model_yw:Number = 0;
-				trace("xw["+model_xw.toString()+"]");
-				trace("yw["+model_yw.toString()+"]");
+				var model_xw:Number = Math.abs(info.xhi - info.xlo);
+				var screen_w:Number = Number(txtScreenWidth.text);
+				var scale:Number = 1;
+				if (screen_w > 0) scale = model_xw/screen_w;
+				var smoothing:Number = Number(drpSmoothing.selectedItem);
 				
 				//setup slices
-				var w:int = SlideShowScreen.bounds.width * drpSmoothing.selectedItem as Number;
-				var h:int = SlideShowScreen.bounds.height * drpSmoothing.selectedItem as Number;
+				var w:int = SlideShowScreen.bounds.width * smoothing * scale;
+				var h:int = SlideShowScreen.bounds.height * smoothing * scale;
 				trace("w["+w.toString()+"]");
 				trace("h["+h.toString()+"]");
 				slicer_args = new <String>[File3D.nativePath,"--cavity=black","--core=white","--layer="+(slice_height*1.1).toString(),"-z"+info.zlo.toString()+","+info.zhi.toString()+","+slice_height.toString(),"-w",w.toString(),"-h",h.toString()];
@@ -399,6 +402,7 @@
 				stopPrint();
 			}
 			private function stopPrint():void {
+				printing = false;
 				blankTimeout.reset(); showTimer.reset();
 				showBlankSlide();
 				if (SlideShowSameScreen && !showPreview) {
@@ -406,6 +410,7 @@
 					Mouse.show();
 				}
 			}
+			private var printing:Boolean = false;
 			private var firstEx:Boolean = true;
 			private function resetAndPrint():void {
 				blankTimeout.reset(); showTimer.reset();
@@ -417,6 +422,7 @@
 					Mouse.hide();
 					SlideShow.visible = true;
 				}
+				printing = true;
 				firstEx = true;
 				onShow(null);
 			}
@@ -438,7 +444,8 @@
 				preview.removeEventListener(FlexEvent.READY, onShowReady);
 				trace("onShowReady");
 				curSlice++;
-				if (!showPreview) setBitmapData(ui_slide, preview.bitmapData, SlideShowScreen.bounds.width, SlideShowScreen.bounds.height);
+				//if (!showPreview) setBitmapData(ui_slide, preview.bitmapData, SlideShowScreen.bounds.width, SlideShowScreen.bounds.height);
+				if (!showPreview) setBitmapData(ui_slide, preview.bitmapData, preview.width, preview.height);
 				
 				if (firstEx) {
 					showTimer.delay = int(txtFirstExposure.text);
@@ -511,40 +518,42 @@
 				 fontWeight="normal"/>
 		<s:Button id="btnChooseSliceFolder" x="461" y="46.150024" label="Choose"
 				  click="btnChooseSliceFolder_click(event)"/>
-		<s:CheckBox id="chkHollow" x="143" y="75" color="#AAAAAA"/>
-		<s:TextInput id="txtShellThickness" x="143" y="97.95" width="43" text="1.0"/>
-		<s:Label x="9" y="103" color="#AAAAAA" text="Shell Thickness (mm)" textAlign="right"/>
-		<s:Label x="60" y="80" color="#AAAAAA" text="Hollow Shell" textAlign="right"/>
-		<s:DropDownList id="drpSmoothing" x="346" y="74" width="56" dataProvider="{lstSmoothing}"
+		<s:CheckBox id="chkHollow" x="143" y="103" color="#AAAAAA"/>
+		<s:TextInput id="txtShellThickness" x="143" y="128.95" width="43" text="1.0"/>
+		<s:Label x="9" y="134" color="#AAAAAA" text="Shell Thickness (mm)" textAlign="right"/>
+		<s:Label x="60" y="108" color="#AAAAAA" text="Hollow Shell" textAlign="right"/>
+		<s:DropDownList id="drpSmoothing" x="346" y="130" width="56" dataProvider="{lstSmoothing}"
 						selectedIndex="1"></s:DropDownList>
-		<s:TextInput id="txtSliceThickness" x="346" y="99.95" width="43" text="1.0"/>
+		<s:TextInput id="txtSliceThickness" x="346" y="101.95" width="43" text="0.1"/>
+		<s:TextInput id="txtScreenWidth" x="346" y="74.95" width="43" text="150"/>
 		<s:Button id="btnGenerate" x="422" y="98" label="Generate Slices" chromeColor="#8EC87A"
 				  click="btnGenerate_click(event)"/>
-		<s:TextInput id="txtCOMPort" x="175" y="272.75" width="24" enter="txtCOMPort_connectHandler(event)" text="6"/>
-		<s:Button id="btnConnect" x="210" y="273" label="Connect" click="txtCOMPort_connectHandler(event)"/>
-		<s:Button id="btnDisconnect" x="290" y="273" label="Disconnect" click="btnDisconnect_Handler(event)"/>
+		<s:TextInput id="txtCOMPort" x="175" y="273.75" width="24" enter="txtCOMPort_connectHandler(event)" text="6"/>
+		<s:Button id="btnConnect" x="210" y="274" label="Connect" click="txtCOMPort_connectHandler(event)"/>
+		<s:Button id="btnDisconnect" x="290" y="274" label="Disconnect" click="btnDisconnect_Handler(event)"/>
 		<s:Button id="btnTrig1" x="450" y="189" label="Up" click="onTrigger1(event)"/>
 		<s:Button id="btnTrig2" x="450" y="222" label="Trigger 2" click="onTrigger2(event)"/>
 		<s:Button id="btnTrig3" x="450" y="256" label="Home" click="onTrigger3(event)"/>
 		<s:Label x="64" y="51" color="#AAAAAA" text="Slice Folder" textAlign="right"/>
 		<s:Label x="52" y="19" color="#AAAAAA" text="3D Object File" textAlign="right"/>
-		<s:Label x="214" y="105" color="#AAAAAA" text="Slice Thickness (mm)" textAlign="right"/>
-		<s:Label x="273" y="80" color="#AAAAAA" text="Smoothing" textAlign="right"/>
-		<s:Label x="62" y="278.75" color="#AAAAAA" text="Arduino Port" textAlign="right"/>
-		<s:Label x="145" y="278.75" color="#FFFFFF" text="COM" textAlign="right"/>
-		<s:BorderContainer x="-1" y="141" width="427" height="124" backgroundColor="#000000">
-			<s:TextInput id="txtExposureTime" x="146" y="51.95" width="67" text="30000"/>
-			<s:TextInput id="txtFirstExposure" x="146" y="20.95" width="67" text="300000"/>
-			<s:Label x="21" y="25" color="#AAAAAA" text="First Exposure (ms)" textAlign="right"/>
-			<s:TextInput id="txtStepperTime" x="146" y="83" width="67" text="15000"/>
-			<s:Button id="btnPreview" x="240" y="54" label="Preview" chromeColor="#E8EB9D"
+		<s:Label x="214" y="107" color="#AAAAAA" text="Slice Thickness (mm)" textAlign="right"/>
+		<s:Label x="172" y="81" color="#AAAAAA" text="Projected Screen Width (mm)" textAlign="right"/>
+		<s:Label x="273" y="136" color="#AAAAAA" text="Smoothing" textAlign="right"/>
+		<s:Label x="62" y="279.75" color="#AAAAAA" text="Arduino Port" textAlign="right"/>
+		<s:Label x="145" y="279.75" color="#FFFFFF" text="COM" textAlign="right"/>
+		<s:BorderContainer x="-1" y="158" width="427" height="108" backgroundColor="#000000">
+			<s:TextInput id="txtExposureTime" x="146" y="40.95" width="67" text="30000"/>
+			<s:TextInput id="txtFirstExposure" x="146" y="9.95" width="67" text="300000"/>
+			<s:Label x="21" y="14" color="#AAAAAA" text="First Exposure (ms)" textAlign="right"/>
+			<s:TextInput id="txtStepperTime" x="146" y="72" width="67" text="15000"/>
+			<s:Button id="btnPreview" x="240" y="43" label="Preview" chromeColor="#E8EB9D"
 					  click="btnPreview_click(event)"/>
-			<s:Button id="btnPrint" x="320" y="54" label="Start Print" chromeColor="#9DCA97"
+			<s:Button id="btnPrint" x="320" y="43" label="Start Print" chromeColor="#9DCA97"
 					  click="btnPrint_click(event)"/>
-			<s:Button id="btnStop" x="320" y="87" width="74" label="Stop" chromeColor="#CA8080"
+			<s:Button id="btnStop" x="320" y="76" width="74" label="Stop" chromeColor="#CA8080"
 					  click="btnStop_click(event)"/>
-			<s:Label x="21" y="56" color="#AAAAAA" text="Exposure Time (ms)" textAlign="right"/>
-			<s:Label x="13" y="87" color="#AAAAAA" text="Stepper Timeout (ms)" textAlign="right"/>
+			<s:Label x="21" y="45" color="#AAAAAA" text="Exposure Time (ms)" textAlign="right"/>
+			<s:Label x="13" y="76" color="#AAAAAA" text="Stepper Timeout (ms)" textAlign="right"/>
 		</s:BorderContainer>
 		<s:Label id="lblStatus" y="310" color="#E08F38" fontSize="16" horizontalCenter="0"
 				 text="status..." textAlign="center"/>
