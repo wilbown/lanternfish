@@ -6,7 +6,7 @@
 					   applicationComplete="handleLoad();"
 					   closing="handleClose();"
 					   showStatusBar="false"
-					   width="562" height="668" backgroundColor="#202020">
+					   width="562" height="668" backgroundColor="#000000">
 	<s:layout>
 		<s:BasicLayout/>
 	</s:layout>
@@ -75,13 +75,14 @@
 				SlideShow = new Window();
 				SlideShow.title = "3DLP Printing...";
 				SlideShow.alwaysInFront = true;
-				SlideShow.opaqueBackground = 0xFF0000;
+				SlideShow.opaqueBackground = 0x000000;
+				SlideShow.setStyle("backgroundColor", "0x000000");
 				setupFullscreenWindowAIR(SlideShow, SlideShowScreen, !SlideShowSameScreen);
+				
 				ui_blank = (new Eblank()).bitmapData;
 				ui_slide = new Bitmap();
-				ui_slide.opaqueBackground = 0xFF0000;
-				setBitmapData(ui_slide, ui_blank, SlideShowScreen.bounds.width, SlideShowScreen.bounds.height);
 				SlideShow.stage.addChild(ui_slide);
+				setBitmapData(ui_slide, ui_blank, SlideShowScreen.bounds.width, SlideShowScreen.bounds.height);
 				
 				//timers for slideshow
 				showTimer = new Timer(int(txtExposureTime.text), 1);
@@ -471,7 +472,7 @@
 			private static function setupFullscreenWindowAIR(win:Window, screen:Screen = null, visible:Boolean = false):void {
 				if (screen == null) screen = Screen.mainScreen;
 				win.systemChrome = NativeWindowSystemChrome.NONE;
-				win.transparent = true;
+				win.transparent = false;
 				win.maximizable = false;
 				win.minimizable = false;
 				win.resizable = false;
@@ -484,12 +485,28 @@
 				//			win.stage.scaleMode = StageScaleMode.SHOW_ALL;
 				//			win.stage.displayState = flash.display.StageDisplayState.FULL_SCREEN_INTERACTIVE;
 			}
-			private static function scaleToFit(can:BorderContainer, w:int, h:int):void {
+			private static function scaleToFit(can:DisplayObject, w:int, h:int):void {
 				var scaleW:Number = (can.width==0)?1.0:Math.floor(w/can.width*100)/100;
 				var scaleH:Number = (can.height==0)?1.0:Math.floor(h/can.height*100)/100;
 				var scale:Number = Math.min(scaleW,scaleH);
 				can.scaleX = scale; can.scaleY = scale;
 				trace("scale: " + scale);
+			}
+			public static function scaleToFitParent(can:DisplayObject):void {
+				var scaleW:Number = (can.width==0)?1.0:Math.floor(can.parent.width/can.width*100)/100;
+				var scaleH:Number = (can.height==0)?1.0:Math.floor(can.parent.height/can.height*100)/100;
+				var scale:Number = Math.min(scaleW,scaleH);
+				can.scaleX = scale; can.scaleY = scale;
+				//trace("width: " + scaleW + " height: " + scaleH);
+			}
+			public static function centerInParent(can:DisplayObject):void {
+				can.x = Math.floor((can.parent.width - can.width)*50)/100;
+				can.y = Math.floor((can.parent.height - can.height)*50)/100;
+				//trace("x: " + can.x + " y: " + can.y);
+			}
+			public static function bottomOfParent(can:DisplayObject, space:int = 0):void {
+				can.y = can.parent.height - can.height - space;
+				//trace("width: " + scaleW + " height: " + scaleH);
 			}
 //			private static function loadBitmap(win:Window):Bitmap {
 //				
@@ -499,8 +516,10 @@
 				bm.width = w; bm.height = h;
 				bm.smoothing = true;
 				//o.pixelSnapping = PixelSnapping.ALWAYS; //defaults to 'auto'
+				bm.opaqueBackground = 0x000000;
 				bm.cacheAsBitmap = true;
 				bm.cacheAsBitmapMatrix = new Matrix();
+				centerInParent(bm);
 			}
 			
 			//************************************************************
