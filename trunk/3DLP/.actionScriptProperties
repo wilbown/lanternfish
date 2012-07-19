@@ -27,7 +27,7 @@
       <airSettings airCertificatePath="C:/Users/Tim/Documents/MakeSLC Flash Builder Digital Cert.p12" airTimestamp="true" anePathSet="true" version="1">
         <airExcludes/>
         <anePaths>
-          <anePathEntry path="C:/lanternfish_dev/trunk/3DLP/as3-ArduinoConnector-1-2-0/ArduinoConnector.ane"/>
+          <anePathEntry path="C:/dev_lanternfish/trunk/3DLP/as3-ArduinoConnector-1-2-0/ArduinoConnector.ane"/>
         </anePaths>
       </airSettings>
       <actionScriptSettings version="1"/>
