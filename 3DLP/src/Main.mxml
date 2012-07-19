@@ -46,7 +46,8 @@
 			//event handlers**************************************************************
 			private function handleInit():void {
 				File3D = File.desktopDirectory; txtFile3D.text = File3D.nativePath;
-				SliceFolder = File.desktopDirectory.resolvePath("3DLP\\slides"); txtSliceFolder.text = SliceFolder.nativePath;
+				SliceFolder = File.desktopDirectory.resolvePath("3DLP\\slides");
+				txtSliceFolder.text = SliceFolder.nativePath;
 				//drpSmoothing.dataProvider = new ArrayList([0.5,1,2,3,4]);
 				//drpSmoothing.labelFunction = function(i:Object):String{return i.toString()+"x"};
 			}
@@ -388,6 +389,11 @@
 			private var curSlice:int = 0;
 			private var sliceFiles:Array = null;
 			private var showPreview:Boolean = false;
+			protected function btnCalibrate_click(event:MouseEvent):void {
+				lblStatus.text = "Printing Calibration slices...";
+				showPreview = true;
+				resetAndPrint();
+			}
 			protected function btnPreview_click(event:MouseEvent):void {
 				lblStatus.text = "Previewing slices...";
 				showPreview = true;
@@ -569,6 +575,8 @@
 					  click="btnPreview_click(event)"/>
 			<s:Button id="btnPrint" x="320" y="43" label="Start Print" chromeColor="#9DCA97"
 					  click="btnPrint_click(event)"/>
+			<s:Button id="btnCalibrate" x="320" y="11" label="Calibrate" chromeColor="#97B6CA"
+					  click="btnCalibrate_click(event)"/>
 			<s:Button id="btnStop" x="320" y="76" width="74" label="Stop" chromeColor="#CA8080"
 					  click="btnStop_click(event)"/>
 			<s:Label x="21" y="45" color="#AAAAAA" text="Exposure Time (ms)" textAlign="right"/>
