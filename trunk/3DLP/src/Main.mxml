@@ -6,7 +6,7 @@
 					   applicationComplete="handleLoad();"
 					   closing="handleClose();"
 					   showStatusBar="false"
-					   width="562" height="668" backgroundColor="#000000">
+					   width="562" height="682" backgroundColor="#000000">
 	<s:layout>
 		<s:BasicLayout/>
 	</s:layout>
@@ -26,9 +26,11 @@
 			internal var arduino:ArduinoConnector = null;
 			internal var blankTimeout:Timer = null;
 			internal var showTimer:Timer = null;
-			internal var SliceApp:File = null;
+			internal var FocusFile:File = null;
+			internal var CalibrationFolder:File = null;
 			internal var File3D:File = null;
 			internal var SliceFolder:File = null;
+			internal var SliceApp:File = null;
 			
 			//GUI*************************************************************************
 			[Embed(source='blank_black.png', mimeType='image/png')]
@@ -45,18 +47,20 @@
 			
 			//event handlers**************************************************************
 			private function handleInit():void {
-				File3D = File.desktopDirectory; txtFile3D.text = File3D.nativePath;
+				File3D = File.desktopDirectory;
+				txtFile3D.text = File3D.nativePath;
 				SliceFolder = File.desktopDirectory.resolvePath("3DLP\\slides");
 				txtSliceFolder.text = SliceFolder.nativePath;
+				//the app that cuts up the 3D model files
+				SliceApp = File.applicationDirectory.resolvePath("Slicer\\dist\\slice.exe");
+				FocusFile = File.applicationDirectory.resolvePath("focus.png");
+				CalibrationFolder = File.applicationDirectory.resolvePath("calibration");
+				trace("CalibrationFolder: " + CalibrationFolder.nativePath);
 				//drpSmoothing.dataProvider = new ArrayList([0.5,1,2,3,4]);
 				//drpSmoothing.labelFunction = function(i:Object):String{return i.toString()+"x"};
 			}
 			private function handleLoad():void {
 				arduinoConnect();
-				
-				//the app that cuts up the 3D model files
-				SliceApp = File.applicationDirectory;
-				SliceApp = SliceApp.resolvePath("Slicer\\dist\\slice.exe");
 				
 				//uses the first extra screen if connected, otherwise the main screen
 				var screenVirtMain:Screen = Screen.getScreensForRectangle(new Rectangle(0, 0, 1, 1))[0];
@@ -385,24 +389,37 @@
 			}
 			
 			
+			
 			//***slideshow control
 			private var curSlice:int = 0;
 			private var sliceFiles:Array = null;
-			private var showPreview:Boolean = false;
+			private var showCalibrate:Boolean = false;
+			private var showFocusFirst:Boolean = false;
+			private var showFullScreen:Boolean = false;
+			private var showOnlyPreview:Boolean = false;
 			protected function btnCalibrate_click(event:MouseEvent):void {
 				lblStatus.text = "Printing Calibration slices...";
-				showPreview = true;
-				resetAndPrint();
+				showOnlyPreview = false;
+				showFocusFirst = true;
+				showFullScreen = true;
+				showCalibrate = true;
+				resetAndPrint(CalibrationFolder);
 			}
 			protected function btnPreview_click(event:MouseEvent):void {
 				lblStatus.text = "Previewing slices...";
-				showPreview = true;
-				resetAndPrint();
+				showOnlyPreview = true;
+				showFocusFirst = false;
+				showFullScreen = false;
+				showCalibrate = false;
+				resetAndPrint(SliceFolder);
 			}
 			protected function btnPrint_click(event:MouseEvent):void {
 				lblStatus.text = "Printing slices...";
-				showPreview = false;
-				resetAndPrint();
+				showOnlyPreview = false;
+				showFocusFirst = false;
+				showFullScreen = false;
+				showCalibrate = false;
+				resetAndPrint(SliceFolder);
 			}
 			protected function btnStop_click(event:MouseEvent):void {
 				lblStatus.text = "Stopped printing slices.";
@@ -412,20 +429,21 @@
 				printing = false;
 				blankTimeout.reset(); showTimer.reset();
 				showBlankSlide();
-				if (SlideShowSameScreen && !showPreview) {
+				if (SlideShowSameScreen && !showOnlyPreview) {
 					SlideShow.visible = false;
 					Mouse.show();
 				}
 			}
 			private var printing:Boolean = false;
 			private var firstEx:Boolean = true;
-			private function resetAndPrint():void {
+			private function resetAndPrint(srcFolder:File):void {
 				blankTimeout.reset(); showTimer.reset();
 				blankTimeout.delay = int(txtStepperTime.text);
 				
-				sliceFiles = SliceFolder.getDirectoryListing();
+				sliceFiles = srcFolder.getDirectoryListing();
+				if (showFocusFirst) sliceFiles.unshift(FocusFile);
 				curSlice = 0;
-				if (SlideShowSameScreen && !showPreview) {
+				if (SlideShowSameScreen && !showOnlyPreview) {
 					Mouse.hide();
 					SlideShow.visible = true;
 				}
@@ -441,7 +459,7 @@
 					return;
 				}
 				showBlankSlide(); trace("onBlank");
-				if (!showPreview && arduino!=null && arduino.portOpen) arduino.writeByte(48);
+				if (!showOnlyPreview && arduino!=null && arduino.portOpen) arduino.writeByte(48);
 				blankTimeout.start();
 			}
 			public function onShow(e:TimerEvent):void {
@@ -451,14 +469,24 @@
 				preview.removeEventListener(FlexEvent.READY, onShowReady);
 				trace("onShowReady");
 				curSlice++;
-				//if (!showPreview) setBitmapData(ui_slide, preview.bitmapData, SlideShowScreen.bounds.width, SlideShowScreen.bounds.height);
-				if (!showPreview) setBitmapData(ui_slide, preview.bitmapData, preview.width, preview.height);
+				if (!showOnlyPreview) {
+					if (showFullScreen) setBitmapData(ui_slide, preview.bitmapData, SlideShowScreen.bounds.width, SlideShowScreen.bounds.height);
+					else setBitmapData(ui_slide, preview.bitmapData, preview.bitmapData.width, preview.bitmapData.height);
+				}
 				
 				if (firstEx) {
 					showTimer.delay = int(txtFirstExposure.text);
 					firstEx = false;
 				}
-				else showTimer.delay = int(txtExposureTime.text);
+				else {
+					var calTime:Number = int(txtExposureTime.text) - int(txtExposureTimeCalibrate.text);
+					if (showCalibrate) {
+						showTimer.delay = int(txtExposureTime.text) - int(calTime/60*(curSlice-2));
+					} else {
+						showTimer.delay = int(txtExposureTime.text) - int(calTime/60*int(txtCalibrationMark.text));
+					}
+					trace("showTimer.delay = "+showTimer.delay.toString());
+				}
 				showTimer.start();
 			}
 			private function showBlankSlide():void {
@@ -467,7 +495,7 @@
 			}
 			private function showCurSlide():void {
 				var f:File = sliceFiles[curSlice];
-				lblStatus.text = (showPreview?"Preview of":"Exposing")+" ["+f.name+"]...";
+				lblStatus.text = (showOnlyPreview?"Preview of":"Exposing")+" ["+f.name+"]...";
 				preview.addEventListener(FlexEvent.READY, onShowReady);
 				preview.source = f.nativePath;
 			}
@@ -534,7 +562,7 @@
 	<fx:Declarations>
 		<!-- Place non-visual elements (e.g., services, value objects) here -->
 	</fx:Declarations>
-	<s:BorderContainer y="11" width="541" height="334" backgroundColor="#000000" borderVisible="true"
+	<s:BorderContainer y="11" width="541" height="346" backgroundColor="#000000" borderVisible="true"
 					   horizontalCenter="0">
 		<s:Label id="txtFile3D" x="143" y="14.95" width="310" color="#FFFFFF"/>
 		<s:Button id="btnChooseFile3D" x="461" y="14.150024" label="Choose"
@@ -553,39 +581,43 @@
 		<s:TextInput id="txtScreenWidth" x="346" y="74.95" width="43" text="150"/>
 		<s:Button id="btnGenerate" x="422" y="98" label="Generate Slices" chromeColor="#8EC87A"
 				  click="btnGenerate_click(event)"/>
-		<s:TextInput id="txtCOMPort" x="175" y="273.75" width="24" enter="txtCOMPort_connectHandler(event)" text="6"/>
-		<s:Button id="btnConnect" x="210" y="274" label="Connect" click="txtCOMPort_connectHandler(event)"/>
-		<s:Button id="btnDisconnect" x="290" y="274" label="Disconnect" click="btnDisconnect_Handler(event)"/>
-		<s:Button id="btnTrig1" x="450" y="189" label="Up" click="onTrigger1(event)"/>
-		<s:Button id="btnTrig2" x="450" y="222" label="Trigger 2" click="onTrigger2(event)"/>
-		<s:Button id="btnTrig3" x="450" y="256" label="Home" click="onTrigger3(event)"/>
+		<s:TextInput id="txtCOMPort" x="175" y="290.75" width="24" enter="txtCOMPort_connectHandler(event)" text="6"/>
+		<s:Button id="btnConnect" x="210" y="291" label="Connect" click="txtCOMPort_connectHandler(event)"/>
+		<s:Button id="btnDisconnect" x="290" y="291" label="Disconnect" click="btnDisconnect_Handler(event)"/>
+		<s:Button id="btnTrig1" x="450" y="223" label="Up" click="onTrigger1(event)"/>
+		<s:Button id="btnTrig2" x="450" y="256" label="Trigger 2" click="onTrigger2(event)"/>
+		<s:Button id="btnTrig3" x="450" y="290" label="Home" click="onTrigger3(event)"/>
 		<s:Label x="64" y="51" color="#AAAAAA" text="Slice Folder" textAlign="right"/>
 		<s:Label x="52" y="19" color="#AAAAAA" text="3D Object File" textAlign="right"/>
 		<s:Label x="214" y="107" color="#AAAAAA" text="Slice Thickness (mm)" textAlign="right"/>
 		<s:Label x="172" y="81" color="#AAAAAA" text="Projected Screen Width (mm)" textAlign="right"/>
 		<s:Label x="273" y="136" color="#AAAAAA" text="Smoothing" textAlign="right"/>
-		<s:Label x="62" y="279.75" color="#AAAAAA" text="Arduino Port" textAlign="right"/>
-		<s:Label x="145" y="279.75" color="#FFFFFF" text="COM" textAlign="right"/>
-		<s:BorderContainer x="-1" y="158" width="427" height="108" backgroundColor="#000000">
-			<s:TextInput id="txtExposureTime" x="146" y="40.95" width="67" text="30000"/>
-			<s:TextInput id="txtFirstExposure" x="146" y="9.95" width="67" text="300000"/>
-			<s:Label x="21" y="14" color="#AAAAAA" text="First Exposure (ms)" textAlign="right"/>
-			<s:TextInput id="txtStepperTime" x="146" y="72" width="67" text="15000"/>
-			<s:Button id="btnPreview" x="240" y="43" label="Preview" chromeColor="#E8EB9D"
+		<s:Label x="62" y="296.75" color="#AAAAAA" text="Arduino Port" textAlign="right"/>
+		<s:Label x="145" y="296.75" color="#FFFFFF" text="COM" textAlign="right"/>
+		<s:BorderContainer x="-1" y="158" width="427" height="126" backgroundColor="#000000">
+			<s:TextInput id="txtExposureTime" x="146" y="6.85" width="67" text="30000"/>
+			<s:TextInput id="txtCalibrationMark" x="146" y="35.85" width="41" text="00"/>
+			<s:Label x="42" y="40" color="#AAAAAA" text="Calibration Mark" textAlign="right"/>
+			<s:TextInput id="txtExposureTimeCalibrate" x="231" y="6.85" width="67" text="10000"/>
+			<s:TextInput id="txtFirstExposure" x="146" y="64.95" width="67" text="300000"/>
+			<s:Label x="23" y="69" color="#AAAAAA" text="First Exposure (ms)" textAlign="right"/>
+			<s:TextInput id="txtStepperTime" x="146" y="94" width="67" text="15000"/>
+			<s:Button id="btnPreview" x="247" y="49" label="Preview" chromeColor="#E8EB9D"
 					  click="btnPreview_click(event)"/>
-			<s:Button id="btnPrint" x="320" y="43" label="Start Print" chromeColor="#9DCA97"
-					  click="btnPrint_click(event)"/>
-			<s:Button id="btnCalibrate" x="320" y="11" label="Calibrate" chromeColor="#97B6CA"
-					  click="btnCalibrate_click(event)"/>
-			<s:Button id="btnStop" x="320" y="76" width="74" label="Stop" chromeColor="#CA8080"
+			<s:Button id="btnPrint" x="336" y="49" width="74" label="Start Print"
+					  chromeColor="#9DCA97" click="btnPrint_click(event)"/>
+			<s:Button id="btnCalibrate" x="336" y="7" width="74" label="Calibrate"
+					  chromeColor="#97B6CA" click="btnCalibrate_click(event)"/>
+			<s:Button id="btnStop" x="336" y="87" width="74" label="Stop" chromeColor="#CA8080"
 					  click="btnStop_click(event)"/>
-			<s:Label x="21" y="45" color="#AAAAAA" text="Exposure Time (ms)" textAlign="right"/>
-			<s:Label x="13" y="76" color="#AAAAAA" text="Stepper Timeout (ms)" textAlign="right"/>
+			<s:Label x="20" y="11" color="#AAAAAA" text="Exposure Time (ms)" textAlign="right"/>
+			<s:Label x="219" y="12" color="#AAAAAA" text="-" textAlign="right"/>
+			<s:Label x="12" y="98" color="#AAAAAA" text="Stepper Timeout (ms)" textAlign="right"/>
 		</s:BorderContainer>
-		<s:Label id="lblStatus" y="310" color="#E08F38" fontSize="16" horizontalCenter="0"
+		<s:Label id="lblStatus" y="323" color="#E08F38" fontSize="16" horizontalCenter="0"
 				 text="status..." textAlign="center"/>
 	</s:BorderContainer>
-	<s:BorderContainer y="352" width="542" height="305" backgroundColor="#000000"
+	<s:BorderContainer y="365" width="542" height="305" backgroundColor="#000000"
 					   horizontalCenter="0">
 		<s:BitmapImage id="preview" x="0" y="0" width="540" height="303"/>
 	</s:BorderContainer>
