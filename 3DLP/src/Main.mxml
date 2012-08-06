@@ -99,6 +99,7 @@
 				SlideShow.addEventListener(KeyboardEvent.KEY_DOWN, this.onKeyDown);
 			}
 			private function handleClose():void {
+				stopPrint();
 				arduinoDisconnect();
 				SlideShow.close();
 			}
@@ -126,13 +127,13 @@
 					blankTimeout.reset(); showTimer.reset();
 					wherePaused = "S";
 					curSlice--; if (curSlice<0) curSlice = 0;
-					showCurSlide();
+					showCurSlide(true);
 				} else if (e.keyCode == Keyboard.RIGHT) { //forward a slide
 					blankTimeout.reset(); showTimer.reset();
 					wherePaused = "S";
 					var sl:int = sliceFiles.length-1;
 					curSlice++; if (curSlice>sl) curSlice = sl;
-					showCurSlide();
+					showCurSlide(true);
 				}
 			}
 			
@@ -173,27 +174,20 @@
 				}
 			}
 			public function onTrigger1(event:MouseEvent):void {
-				if (arduino!=null && arduino.portOpen) {
-					arduino.writeByte(49);
-					lblStatus.text = "Trigger 1 sent to Arduino";
-				}
+				if (arduinoWrite(49)) lblStatus.text = "Trigger 1 sent to Arduino";
 			}
 			public function onTrigger2(event:MouseEvent):void {
-				if (arduino!=null && arduino.portOpen) {
-					arduino.writeByte(50);
-					lblStatus.text = "Trigger 2 sent to Arduino";
-				}
+				if (arduinoWrite(50)) lblStatus.text = "Trigger 2 sent to Arduino";
 			}
 			public function onTrigger3(event:MouseEvent):void {
-				if (arduino!=null && arduino.portOpen) {
-					arduino.writeByte(51);
-					lblStatus.text = "Trigger 3 sent to Arduino";
-				}
+				if (arduinoWrite(51)) lblStatus.text = "Trigger 3 sent to Arduino";
 			}
 			private function onArduino(e:ProgressEvent):void {
+				lblStatus.text = "Arduino --> bytes[" + arduino.bytesAvailable + "]";
+				trace("Event: onArduino, bytes [" + arduino.bytesAvailable + "]");
 				if (arduino.bytesAvailable < 1) return;
 				var code:String = arduino.readBytesAsString().substr(0,1);
-				trace("Event: SOCKET_DATA [" + code + "]");
+				trace("       SOCKET_DATA [" + code + "]");
 				
 				if (code == "S") {
 					lblStatus.text = "Arduino --> Stopped printing slices.";
@@ -208,6 +202,16 @@
 				} else if (code == "P") {
 					lblStatus.text = "Arduino --> Start Print...";
 				}
+			}
+			private function arduinoWrite(b:uint):Boolean {
+				if (arduino!=null && arduino.portOpen) {
+					if (arduino.writeByte(b)) {
+						trace("Arduino --> Successfully Wrote ["+b.toString()+"]");
+						return true;
+					}
+				}
+				lblStatus.text = "Arduino --> ERROR writing ["+b.toString()+"]";
+				return false;
 			}
 			
 			
@@ -428,6 +432,7 @@
 			private function stopPrint():void {
 				printing = false;
 				blankTimeout.reset(); showTimer.reset();
+				//TODO send interrupt to Arduino to kill it
 				showBlankSlide();
 				if (SlideShowSameScreen && !showOnlyPreview) {
 					SlideShow.visible = false;
@@ -452,22 +457,25 @@
 				onShow(null);
 			}
 			public function onBlank(e:TimerEvent):void {
+				trace("onBlank");
 				lblStatus.text = "Waiting for stepper...";
 				if (curSlice >= sliceFiles.length) {
 					lblStatus.text = "Done printing slices.";
 					stopPrint();
 					return;
 				}
-				showBlankSlide(); trace("onBlank");
-				if (!showOnlyPreview && arduino!=null && arduino.portOpen) arduino.writeByte(48);
-				blankTimeout.start();
+				showBlankSlide();
+				if (printing && !showOnlyPreview) arduinoWrite(48);
+				if (printing) blankTimeout.start();
 			}
 			public function onShow(e:TimerEvent):void {
-				showCurSlide(); trace("onShow");
+				trace("onShow");
+				showCurSlide();
 			}
 			public function onShowReady(e:FlexEvent):void {
 				preview.removeEventListener(FlexEvent.READY, onShowReady);
 				trace("onShowReady");
+				
 				curSlice++;
 				if (!showOnlyPreview) {
 					if (showFullScreen) setBitmapData(ui_slide, preview.bitmapData, SlideShowScreen.bounds.width, SlideShowScreen.bounds.height);
@@ -477,23 +485,23 @@
 				if (firstEx) {
 					showTimer.delay = int(txtFirstExposure.text);
 					firstEx = false;
-				}
-				else {
+				} else {
 					var calTime:Number = int(txtExposureTime.text) - int(txtExposureTimeCalibrate.text);
 					if (showCalibrate) {
 						showTimer.delay = int(txtExposureTime.text) - int(calTime/60*(curSlice-2));
 					} else {
 						showTimer.delay = int(txtExposureTime.text) - int(calTime/60*int(txtCalibrationMark.text));
 					}
-					trace("showTimer.delay = "+showTimer.delay.toString());
 				}
-				showTimer.start();
+				trace("showTimer.delay = "+showTimer.delay.toString());
+				if (printing) showTimer.start();
 			}
 			private function showBlankSlide():void {
 				setBitmapData(ui_slide, ui_blank, SlideShowScreen.bounds.width, SlideShowScreen.bounds.height);
 				preview.source = ui_blank;
 			}
-			private function showCurSlide():void {
+			private function showCurSlide(view:Boolean = false):void {
+				if (!printing && !view) return;
 				var f:File = sliceFiles[curSlice];
 				lblStatus.text = (showOnlyPreview?"Preview of":"Exposing")+" ["+f.name+"]...";
 				preview.addEventListener(FlexEvent.READY, onShowReady);

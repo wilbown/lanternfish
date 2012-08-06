@@ -48,8 +48,8 @@ void loop() {
 //***slave
   if (Serial.available() > 0) {
     in = Serial.read();
-    if (in==48) { //next position
     
+    if (in==48) { //next position
       stepENABLE();
       long steps;
       
@@ -76,15 +76,13 @@ void loop() {
       }
       
       stepDISABLE();
-  
       
       delay(1000);
       
       Serial.println("N"); //show next slide
-    } else if (in==49) { //trigger 1
-    
-      stepENABLE();
       
+    } else if (in==49) { //trigger 1
+      stepENABLE();
       stepUP();
       long steps = 10/stepH;
       long i = 0;
@@ -94,11 +92,9 @@ void loop() {
         stepone();
         i++;
       }
-      
       stepDISABLE();
       
     } else if (in==50) { //trigger 2
-    
       stepENABLE();
       
       long steps;
@@ -126,7 +122,7 @@ void loop() {
       stepDISABLE();
       
     } else if (in==51) { //trigger 3
-      //TEST
+      //HOME
       stepENABLE();
       
       stepHOME();
@@ -164,7 +160,7 @@ void stepHOME() {
 
 boolean stepKILL() {
   if (digitalRead(4) == HIGH) return true;
-  return false;
+  return kill;
 }
 void stepENABLE() {
   digitalWrite(13, HIGH); //LED
@@ -195,3 +191,4 @@ void stepone() {
 
 //set up interrupt pins 2,3 for kill switches
 //attachInterrupt()
+//kill = true;
