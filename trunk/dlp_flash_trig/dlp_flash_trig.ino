@@ -54,7 +54,7 @@ void loop() {
       long steps;
       
       stepUP();
-      steps = 5.0/stepH;
+      steps = 10.0/stepH;
       long i = 0;
       while (i < steps) {
         if (stepKILL()) break; //kill
@@ -63,10 +63,10 @@ void loop() {
         i++;
       }
       
-      delay(10000);
+      delay(15000);
       
       stepDOWN();
-      steps = 4.9/stepH;
+      steps = 9.9/stepH;
       long j = 0;
       while (j < steps) {
         if (stepKILL()) break; //kill
