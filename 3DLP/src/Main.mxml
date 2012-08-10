@@ -35,12 +35,15 @@
 			//GUI*************************************************************************
 			[Embed(source='blank_black.png', mimeType='image/png')]
 			private static var Eblank:Class;
+			[Embed(source='blank_white.png', mimeType='image/png')]
+			private static var Eclean:Class;
 			
 			private var SlideShowSameScreen:Boolean = true;
 			private var SlideShowScreen:Screen = null;
 			public var SlideShow:Window;
 			private var ui_slide:Bitmap;
 			private var ui_blank:BitmapData;
+			private var ui_clean:BitmapData;
 			
 			[Bindable]
 			private var lstSmoothing:ArrayList = new ArrayList([0.5,1,2,3,4]);
@@ -85,6 +88,7 @@
 				setupFullscreenWindowAIR(SlideShow, SlideShowScreen, !SlideShowSameScreen);
 				
 				ui_blank = (new Eblank()).bitmapData;
+				ui_clean = (new Eclean()).bitmapData;
 				ui_slide = new Bitmap();
 				SlideShow.stage.addChild(ui_slide);
 				setBitmapData(ui_slide, ui_blank, SlideShowScreen.bounds.width, SlideShowScreen.bounds.height);
@@ -183,10 +187,11 @@
 				if (arduinoWrite(51)) lblStatus.text = "Trigger 3 sent to Arduino";
 			}
 			private function onArduino(e:ProgressEvent):void {
-				lblStatus.text = "Arduino --> bytes[" + arduino.bytesAvailable + "]";
+				//lblStatus.text = "Arduino --> bytes[" + arduino.bytesAvailable + "]";
 				trace("Event: onArduino, bytes [" + arduino.bytesAvailable + "]");
 				if (arduino.bytesAvailable < 1) return;
 				var code:String = arduino.readBytesAsString().substr(0,1);
+				arduino.flush();
 				trace("       SOCKET_DATA [" + code + "]");
 				
 				if (code == "S") {
@@ -429,6 +434,10 @@
 				lblStatus.text = "Stopped printing slices.";
 				stopPrint();
 			}
+			protected function btnClean_click(event:MouseEvent):void {
+				lblStatus.text = "Showing white cleaning screen.";
+				setBitmapData(ui_slide, ui_clean, SlideShowScreen.bounds.width, SlideShowScreen.bounds.height);
+			}
 			private function stopPrint():void {
 				printing = false;
 				blankTimeout.reset(); showTimer.reset();
@@ -609,15 +618,17 @@
 			<s:TextInput id="txtExposureTimeCalibrate" x="231" y="6.85" width="67" text="10000"/>
 			<s:TextInput id="txtFirstExposure" x="146" y="64.95" width="67" text="300000"/>
 			<s:Label x="23" y="69" color="#AAAAAA" text="First Exposure (ms)" textAlign="right"/>
-			<s:TextInput id="txtStepperTime" x="146" y="94" width="67" text="15000"/>
+			<s:TextInput id="txtStepperTime" x="146" y="94" width="67" text="40000"/>
 			<s:Button id="btnPreview" x="247" y="49" label="Preview" chromeColor="#E8EB9D"
 					  click="btnPreview_click(event)"/>
 			<s:Button id="btnPrint" x="336" y="49" width="74" label="Start Print"
 					  chromeColor="#9DCA97" click="btnPrint_click(event)"/>
 			<s:Button id="btnCalibrate" x="336" y="7" width="74" label="Calibrate"
 					  chromeColor="#97B6CA" click="btnCalibrate_click(event)"/>
-			<s:Button id="btnStop" x="336" y="87" width="74" label="Stop" chromeColor="#CA8080"
+			<s:Button id="btnStop" x="336" y="91" width="74" label="Stop" chromeColor="#CA8080"
 					  click="btnStop_click(event)"/>
+			<s:Button id="btnClean" x="247" y="91" width="68" label="Clean" chromeColor="#FFFFFF"
+					  click="btnClean_click(event)"/>
 			<s:Label x="20" y="11" color="#AAAAAA" text="Exposure Time (ms)" textAlign="right"/>
 			<s:Label x="219" y="12" color="#AAAAAA" text="-" textAlign="right"/>
 			<s:Label x="12" y="98" color="#AAAAAA" text="Stepper Timeout (ms)" textAlign="right"/>
