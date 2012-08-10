@@ -404,13 +404,13 @@
 			private var sliceFiles:Array = null;
 			private var showCalibrate:Boolean = false;
 			private var showFocusFirst:Boolean = false;
-			private var showFullScreen:Boolean = false;
+			private var showBuildSize:Boolean = false;
 			private var showOnlyPreview:Boolean = false;
 			protected function btnCalibrate_click(event:MouseEvent):void {
 				lblStatus.text = "Printing Calibration slices...";
 				showOnlyPreview = false;
 				showFocusFirst = true;
-				showFullScreen = true;
+				showBuildSize = true;
 				showCalibrate = true;
 				resetAndPrint(CalibrationFolder);
 			}
@@ -418,7 +418,7 @@
 				lblStatus.text = "Previewing slices...";
 				showOnlyPreview = true;
 				showFocusFirst = false;
-				showFullScreen = false;
+				showBuildSize = false;
 				showCalibrate = false;
 				resetAndPrint(SliceFolder);
 			}
@@ -426,7 +426,7 @@
 				lblStatus.text = "Printing slices...";
 				showOnlyPreview = false;
 				showFocusFirst = false;
-				showFullScreen = false;
+				showBuildSize = false;
 				showCalibrate = false;
 				resetAndPrint(SliceFolder);
 			}
@@ -487,7 +487,10 @@
 				
 				curSlice++;
 				if (!showOnlyPreview) {
-					if (showFullScreen) setBitmapData(ui_slide, preview.bitmapData, SlideShowScreen.bounds.width, SlideShowScreen.bounds.height);
+					
+					//TODO fix to make it fit Build Plateform exactally
+					var BuildScale:Number = Math.min(Number(txtBuildWidth.text), Number(txtBuildHeight.text)) / Number(txtScreenWidth.text);
+					if (showBuildSize) setBitmapData(ui_slide, preview.bitmapData, BuildScale * SlideShowScreen.bounds.width, BuildScale * SlideShowScreen.bounds.height);
 					else setBitmapData(ui_slide, preview.bitmapData, preview.bitmapData.width, preview.bitmapData.height);
 				}
 				
@@ -581,60 +584,64 @@
 	</fx:Declarations>
 	<s:BorderContainer y="11" width="541" height="346" backgroundColor="#000000" borderVisible="true"
 					   horizontalCenter="0">
-		<s:Label id="txtFile3D" x="143" y="14.95" width="310" color="#FFFFFF"/>
-		<s:Button id="btnChooseFile3D" x="461" y="14.150024" label="Choose"
+		<s:Button id="btnChooseFile3D" x="461" y="8.15" label="Choose"
 				  click="btnChooseFile3D_click(event)"/>
-		<s:Label id="txtSliceFolder" x="143" y="46.95" width="310" color="#FFFFFF"
-				 fontWeight="normal"/>
-		<s:Button id="btnChooseSliceFolder" x="461" y="46.150024" label="Choose"
+		<s:Button id="btnChooseSliceFolder" x="461" y="37.15" label="Choose"
 				  click="btnChooseSliceFolder_click(event)"/>
-		<s:CheckBox id="chkHollow" x="143" y="103" color="#AAAAAA"/>
-		<s:TextInput id="txtShellThickness" x="143" y="128.95" width="43" text="1.0"/>
-		<s:Label x="9" y="134" color="#AAAAAA" text="Shell Thickness (mm)" textAlign="right"/>
-		<s:Label x="60" y="108" color="#AAAAAA" text="Hollow Shell" textAlign="right"/>
-		<s:DropDownList id="drpSmoothing" x="346" y="130" width="56" dataProvider="{lstSmoothing}"
+		<s:CheckBox id="chkHollow" x="143" y="95" color="#AAAAAA"/>
+		<s:TextInput id="txtShellThickness" x="143" y="120.95" width="43" text="1.0"/>
+		<s:DropDownList id="drpSmoothing" x="346" y="122" width="56" dataProvider="{lstSmoothing}"
 						selectedIndex="1"></s:DropDownList>
-		<s:TextInput id="txtSliceThickness" x="346" y="101.95" width="43" text="0.1"/>
-		<s:TextInput id="txtScreenWidth" x="346" y="74.95" width="43" text="150"/>
-		<s:Button id="btnGenerate" x="422" y="98" label="Generate Slices" chromeColor="#8EC87A"
+		<s:TextInput id="txtSliceThickness" x="346" y="93.95" width="43" text="0.1"/>
+		<s:TextInput id="txtScreenWidth" x="143" y="67.95" width="43" text="150"/>
+		<s:Button id="btnGenerate" x="422" y="87" label="Generate Slices" chromeColor="#8EC87A"
 				  click="btnGenerate_click(event)"/>
-		<s:TextInput id="txtCOMPort" x="175" y="290.75" width="24" enter="txtCOMPort_connectHandler(event)" text="6"/>
-		<s:Button id="btnConnect" x="210" y="291" label="Connect" click="txtCOMPort_connectHandler(event)"/>
-		<s:Button id="btnDisconnect" x="290" y="291" label="Disconnect" click="btnDisconnect_Handler(event)"/>
+		<s:TextInput id="txtCOMPort" x="175" y="291.75" width="24" enter="txtCOMPort_connectHandler(event)" text="6"/>
+		<s:Button id="btnConnect" x="210" y="292" label="Connect" click="txtCOMPort_connectHandler(event)"/>
+		<s:Button id="btnDisconnect" x="290" y="292" label="Disconnect" click="btnDisconnect_Handler(event)"/>
 		<s:Button id="btnTrig1" x="450" y="223" label="Up" click="onTrigger1(event)"/>
 		<s:Button id="btnTrig2" x="450" y="256" label="Trigger 2" click="onTrigger2(event)"/>
 		<s:Button id="btnTrig3" x="450" y="290" label="Home" click="onTrigger3(event)"/>
-		<s:Label x="64" y="51" color="#AAAAAA" text="Slice Folder" textAlign="right"/>
-		<s:Label x="52" y="19" color="#AAAAAA" text="3D Object File" textAlign="right"/>
-		<s:Label x="214" y="107" color="#AAAAAA" text="Slice Thickness (mm)" textAlign="right"/>
-		<s:Label x="172" y="81" color="#AAAAAA" text="Projected Screen Width (mm)" textAlign="right"/>
-		<s:Label x="273" y="136" color="#AAAAAA" text="Smoothing" textAlign="right"/>
-		<s:Label x="62" y="296.75" color="#AAAAAA" text="Arduino Port" textAlign="right"/>
-		<s:Label x="145" y="296.75" color="#FFFFFF" text="COM" textAlign="right"/>
-		<s:BorderContainer x="-1" y="158" width="427" height="126" backgroundColor="#000000">
-			<s:TextInput id="txtExposureTime" x="146" y="6.85" width="67" text="30000"/>
-			<s:TextInput id="txtCalibrationMark" x="146" y="35.85" width="41" text="00"/>
-			<s:Label x="42" y="40" color="#AAAAAA" text="Calibration Mark" textAlign="right"/>
-			<s:TextInput id="txtExposureTimeCalibrate" x="231" y="6.85" width="67" text="10000"/>
-			<s:TextInput id="txtFirstExposure" x="146" y="64.95" width="67" text="300000"/>
-			<s:Label x="23" y="69" color="#AAAAAA" text="First Exposure (ms)" textAlign="right"/>
-			<s:TextInput id="txtStepperTime" x="146" y="94" width="67" text="40000"/>
-			<s:Button id="btnPreview" x="247" y="49" label="Preview" chromeColor="#E8EB9D"
+		<s:BorderContainer x="-1" y="150" width="427" height="134" backgroundColor="#000000">
+			<s:TextInput id="txtExposureTime" x="146" y="37.85" width="67" text="30000"/>
+			<s:TextInput id="txtCalibrationMark" x="308" y="37.85" width="28" text="00"/>
+			<s:TextInput id="txtExposureTimeCalibrate" x="231" y="37.85" width="67" text="10000"/>
+			<s:TextInput id="txtFirstExposure" x="146" y="72.9" width="67" text="300000"/>
+			<s:TextInput id="txtStepperTime" x="146" y="102" width="67" text="40000"/>
+			<s:Button id="btnPreview" x="247" y="71" width="68" label="Preview" chromeColor="#E8EB9D"
 					  click="btnPreview_click(event)"/>
-			<s:Button id="btnPrint" x="336" y="49" width="74" label="Start Print"
+			<s:Button id="btnPrint" x="342" y="71" width="74" label="Start Print"
 					  chromeColor="#9DCA97" click="btnPrint_click(event)"/>
-			<s:Button id="btnCalibrate" x="336" y="7" width="74" label="Calibrate"
+			<s:Button id="btnCalibrate" x="342" y="38" width="74" label="Calibrate"
 					  chromeColor="#97B6CA" click="btnCalibrate_click(event)"/>
-			<s:Button id="btnStop" x="336" y="91" width="74" label="Stop" chromeColor="#CA8080"
+			<s:Button id="btnStop" x="342" y="102" width="74" label="Stop" chromeColor="#CA8080"
 					  click="btnStop_click(event)"/>
-			<s:Button id="btnClean" x="247" y="91" width="68" label="Clean" chromeColor="#FFFFFF"
+			<s:Button id="btnClean" x="247" y="102" width="68" label="Clean" chromeColor="#FFFFFF"
 					  click="btnClean_click(event)"/>
-			<s:Label x="20" y="11" color="#AAAAAA" text="Exposure Time (ms)" textAlign="right"/>
-			<s:Label x="219" y="12" color="#AAAAAA" text="-" textAlign="right"/>
-			<s:Label x="12" y="98" color="#AAAAAA" text="Stepper Timeout (ms)" textAlign="right"/>
+			<s:Label x="23" y="77" color="#AAAAAA" text="First Exposure (ms)" textAlign="right"/>
+			<s:Label x="20" y="42" color="#AAAAAA" text="Exposure Time (ms)" textAlign="right"/>
+			<s:Label x="219" y="43" color="#AAAAAA" text="-" textAlign="right"/>
+			<s:Label x="12" y="106" color="#AAAAAA" text="Stepper Timeout (ms)" textAlign="right"/>
+			<s:TextInput id="txtBuildWidth" x="146" y="6.95" width="43" text="150"/>
+			<s:TextInput id="txtBuildHeight" x="222" y="6.95" width="43" text="150"/>
+			<s:Label x="21" y="16" color="#AAAAAA" text="Build Platform (mm)" textAlign="right"/>
+			<s:Label x="194" y="16" color="#AAAAAA" text="W" textAlign="right"/>
+			<s:Label x="270" y="16" color="#AAAAAA" text="D" textAlign="right"/>
 		</s:BorderContainer>
 		<s:Label id="lblStatus" y="323" color="#E08F38" fontSize="16" horizontalCenter="0"
 				 text="status..." textAlign="center"/>
+		<s:Label x="64" y="42" color="#AAAAAA" text="Slice Folder" textAlign="right"/>
+		<s:Label x="52" y="13" color="#AAAAAA" text="3D Object File" textAlign="right"/>
+		<s:Label x="214" y="99" color="#AAAAAA" text="Slice Thickness (mm)" textAlign="right"/>
+		<s:Label x="8" y="74" color="#AAAAAA" text="Projection Width (mm)" textAlign="right"/>
+		<s:Label x="273" y="128" color="#AAAAAA" text="Smoothing" textAlign="right"/>
+		<s:Label x="62" y="297.75" color="#AAAAAA" text="Arduino Port" textAlign="right"/>
+		<s:Label x="145" y="297.75" color="#FFFFFF" text="COM" textAlign="right"/>
+		<s:Label id="txtFile3D" x="143" y="8.95" width="310" color="#FFFFFF"/>
+		<s:Label id="txtSliceFolder" x="143" y="37.95" width="310" color="#FFFFFF"
+				 fontWeight="normal"/>
+		<s:Label x="9" y="126" color="#AAAAAA" text="Shell Thickness (mm)" textAlign="right"/>
+		<s:Label x="60" y="100" color="#AAAAAA" text="Hollow Shell" textAlign="right"/>
 	</s:BorderContainer>
 	<s:BorderContainer y="365" width="542" height="305" backgroundColor="#000000"
 					   horizontalCenter="0">
