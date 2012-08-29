@@ -8,6 +8,8 @@ float stepH = 0.008466;         // number of steps per mm
 
 void setup() {
   Serial.begin(57600);
+  pinMode(8,OUTPUT); //ultrasonic control (HIGH = off)
+  digitalWrite(8,HIGH);
   
   pinMode(11,OUTPUT); //enable
   pinMode(7,OUTPUT); //direction
@@ -29,8 +31,7 @@ void setup() {
 //int state13 = LOW;
 //int c = 8;
 int in = -1;
-boolean kill = false;
-
+boolean sercom = false;
 
 void loop() {
 //***master
@@ -47,8 +48,17 @@ void loop() {
   
 //***slave
   if (Serial.available() > 0) {
+    sercom = true;
     in = Serial.read();
-    
+  }
+  
+  if (stepKILL()) {
+    sercom = false; //throw away serial
+    return;
+  }
+  
+  if (sercom) {
+    sercom = false;
     if (in==48) { //next position
       stepENABLE();
       long steps;
@@ -76,8 +86,9 @@ void loop() {
       }
       
       stepDISABLE();
-      
-      delay(1000);
+      digitalWrite(8,HIGH); //let ultrasonic cool down
+      delay(30000);
+      digitalWrite(8,LOW);
       
       Serial.println("N"); //show next slide
       
@@ -97,27 +108,27 @@ void loop() {
     } else if (in==50) { //trigger 2
       stepENABLE();
       
-      long steps;
-      long i;
-      
-      stepUP();
-      steps = 100/stepH;
-      i = 0;
-      while (i < steps) {
-        if (stepKILL()) break; //kill
-        if (digitalRead(2) == HIGH) break;
-        stepone();
-        i++;
-      }
-      stepDOWN();
-      steps = 100/stepH;
-      i = 0;
-      while (i < steps) {
-        if (stepKILL()) break; //kill
-        if (digitalRead(2) == HIGH) break;
-        stepone();
-        i++;
-      }
+//      long steps;
+//      long i;
+//      
+//      stepUP();
+//      steps = 100/stepH;
+//      i = 0;
+//      while (i < steps) {
+//        if (stepKILL()) break; //kill
+//        if (digitalRead(2) == HIGH) break;
+//        stepone();
+//        i++;
+//      }
+//      stepDOWN();
+//      steps = 100/stepH;
+//      i = 0;
+//      while (i < steps) {
+//        if (stepKILL()) break; //kill
+//        if (digitalRead(2) == HIGH) break;
+//        stepone();
+//        i++;
+//      }
       
       stepDISABLE();
       
@@ -135,6 +146,21 @@ void loop() {
 //***just testing switch
 //  if (digitalRead(2)==HIGH) digitalWrite(13, LOW);
 //  else digitalWrite(13, HIGH);
+}
+
+boolean kill = false;
+boolean stepKILL() {
+  if (digitalRead(4) == HIGH) {
+    if (!kill) {
+      digitalWrite(8,HIGH); //turn off ultrasonic
+      Serial.println("S"); //stop AIR app
+    }
+    kill = true;
+    return true;
+  }
+  if (kill) digitalWrite(8,LOW); //turn on ultrasonic
+  kill = false;
+  return false;
 }
 
 void stepHOME() {
@@ -158,10 +184,6 @@ void stepHOME() {
     }
 }
 
-boolean stepKILL() {
-  if (digitalRead(4) == HIGH) return true;
-  return kill;
-}
 void stepENABLE() {
   digitalWrite(13, HIGH); //LED
   digitalWrite(11, HIGH); //Enable
