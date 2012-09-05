@@ -69,7 +69,7 @@ void loop() {
       while (i < steps) {
         if (stepKILL()) break; //kill
         if (digitalRead(2) == HIGH) break;
-        stepone();
+        steponeSlow();
         i++;
       }
       
@@ -108,6 +108,15 @@ void loop() {
     } else if (in==50) { //trigger 2
       stepENABLE();
       
+      stepUP();
+      long steps = 170/stepH;
+      long i = 0;
+      while (i < steps) {
+        if (stepKILL()) break; //kill
+        if (digitalRead(2) == HIGH) break;
+        stepone();
+        i++;
+      }
 //      long steps;
 //      long i;
 //      
@@ -206,6 +215,13 @@ void stepDOWN() {
 void stepone() {
   digitalWrite(6, HIGH); //Step
   delayMicroseconds(3000);
+  //delay(1);
+  digitalWrite(6, LOW); //reset Step
+  //delay(10);
+}
+void steponeSlow() {
+  digitalWrite(6, HIGH); //Step
+  delay(50);
   //delay(1);
   digitalWrite(6, LOW); //reset Step
   //delay(10);
